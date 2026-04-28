@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurora — AI Instagram Curator</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#FAF8F5;
+  --warm-white:#F5F0E8;
+  --gold:#C9A96E;
+  --gold-light:#E8D5B0;
+  --gold-pale:#F5EDD8;
+  --charcoal:#2C2420;
+  --charcoal-soft:#3D3028;
+  --muted:#8B7355;
+  --muted-light:#B5A08A;
+  --border:#E8E0D0;
+  --border-light:#F0E8DC;
+  --surface:#FFFFFF;
+  --surface-warm:#FDFAF6;
+}
+html{scroll-behavior:smooth;}
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--cream);
+  color:var(--charcoal);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.serif{font-family:'Cormorant Garamond',serif;}
+
+/* Layout */
+.app{max-width:1080px;margin:0 auto;padding:0 1.5rem 6rem;}
+
+/* Header */
+.header{
+  text-align:center;
+  padding:3rem 0 2.5rem;
+  position:relative;
+}
+.header::after{
+  content:'';
+  display:block;
+  width:40px;height:1px;
+  background:var(--gold-light);
+  margin:1.5rem auto 0;
+}
+.logo{
+  font-family:'Cormorant Garamond',serif;
+  font-size:3rem;
+  font-weight:300;
+  letter-spacing:0.18em;
+  color:var(--charcoal);
+  line-height:1;
+}
+.logo-accent{color:var(--gold);}
+.tagline{
+  font-size:0.72rem;
+  letter-spacing:0.28em;
+  text-transform:uppercase;
+  color:var(--muted-light);
+  margin-top:0.6rem;
+  font-weight:400;
+}
+
+/* API Key setup */
+.api-setup{
+  max-width:480px;
+  margin:0 auto 2.5rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:1.5rem;
+}
+.api-setup-title{
+  font-size:0.72rem;
+  letter-spacing:0.15em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:0.8rem;
+}
+.api-row{display:flex;gap:8px;}
+.api-input{
+  flex:1;
+  padding:0.6rem 0.9rem;
+  border:1px solid var(--border);
+  border-radius:8px;
+  font-family:'DM Sans',sans-serif;
+  font-size:0.82rem;
+  color:var(--charcoal);
+  background:var(--cream);
+  outline:none;
+  transition:border-color 0.2s;
+}
+.api-input:focus{border-color:var(--gold);}
+.api-note{font-size:0.72rem;color:var(--muted-light);margin-top:0.5rem;line-height:1.5;}
+.api-note a{color:var(--gold);text-decoration:none;}
+.api-note a:hover{text-decoration:underline;}
+
+/* Steps nav */
+.steps-nav{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+  margin-bottom:2.5rem;
+  flex-wrap:wrap;
+  row-gap:0.5rem;
+}
+.step-item{display:flex;align-items:center;}
+.step-dot{
+  width:30px;height:30px;
+  border-radius:50%;
+  border:1.5px solid var(--border);
+  background:var(--surface);
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.7rem;
+  color:var(--muted-light);
+  transition:all 0.35s;
+  flex-shrink:0;
+  cursor:default;
+}
+.step-dot.active{border-color:var(--gold);background:var(--gold);color:white;font-weight:500;box-shadow:0 0 0 3px rgba(201,169,110,0.15);}
+.step-dot.done{border-color:var(--gold-light);background:var(--warm-white);color:var(--gold);}
+.step-dot.done:hover{cursor:pointer;background:var(--gold-pale);}
+.step-label{font-size:0.71rem;color:var(--muted-light);margin-left:7px;letter-spacing:0.04em;white-space:nowrap;}
+.step-label.active{color:var(--charcoal);font-weight:500;}
+.step-line{width:36px;height:1px;background:var(--border);margin:0 6px;flex-shrink:0;}
+
+/* Cards */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:2.2rem 2.5rem;
+  box-shadow:0 2px 20px rgba(44,36,32,0.04);
+  animation:fadeUp 0.4s ease;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.section-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.7rem;
+  font-weight:400;
+  margin-bottom:0.35rem;
+  line-height:1.2;
+}
+.section-sub{
+  font-size:0.82rem;
+  color:var(--muted);
+  line-height:1.7;
+  margin-bottom:1.8rem;
+  max-width:520px;
+}
+
+/* Upload zone */
+.upload-zone{
+  border:1.5px dashed var(--gold-light);
+  border-radius:14px;
+  padding:2.8rem 2rem;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.25s;
+  background:rgba(201,169,110,0.02);
+  position:relative;
+}
+.upload-zone:hover,.upload-zone.dragging{
+  border-color:var(--gold);
+  background:rgba(201,169,110,0.06);
+}
+.upload-zone.disabled{opacity:0.5;cursor:not-allowed;}
+.upload-zone input{display:none;}
+.upload-icon{
+  width:44px;height:44px;
+  border-radius:50%;
+  border:1.5px solid var(--gold-light);
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 1rem;
+  color:var(--gold);
+  font-size:1.2rem;
+}
+.upload-text{font-size:0.83rem;color:var(--muted);line-height:1.6;}
+.upload-text strong{color:var(--charcoal);font-weight:500;}
+
+/* Image grids */
+.img-grid{display:grid;gap:10px;margin-top:1.2rem;}
+.grid-5{grid-template-columns:repeat(5,1fr);}
+.grid-auto{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));}
+.grid-auto-lg{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
+
+.img-thumb{
+  position:relative;
+  aspect-ratio:1;
+  border-radius:10px;
+  overflow:hidden;
+  border:2px solid transparent;
+  transition:all 0.2s;
+  cursor:default;
+}
+.img-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.img-thumb .remove-btn{
+  position:absolute;top:5px;right:5px;
+  width:22px;height:22px;
+  border-radius:50%;
+  background:rgba(44,36,32,0.65);
+  color:white;border:none;
+  cursor:pointer;font-size:9px;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity 0.2s;
+  backdrop-filter:blur(4px);
+}
+.img-thumb:hover .remove-btn{opacity:1;}
+.img-thumb.selected{border-color:var(--gold);}
+.img-thumb.selected .check{
+  position:absolute;bottom:5px;right:5px;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--gold);color:white;
+  font-size:9px;display:flex;align-items:center;justify-content:center;
+  font-weight:600;
+}
+.img-thumb.dimmed{opacity:0.3;}
+.img-thumb.clickable{cursor:pointer;}
+.img-thumb.clickable:hover{transform:scale(1.03);}
+.score-badge{
+  position:absolute;top:5px;left:5px;
+  background:rgba(201,169,110,0.92);
+  color:white;font-size:9px;
+  padding:2px 7px;border-radius:10px;font-weight:600;
+  backdrop-filter:blur(4px);
+}
+
+/* Buttons */
+.btn{
+  padding:0.65rem 1.6rem;
+  border-radius:9px;
+  border:1.5px solid var(--gold);
+  background:var(--gold);
+  color:white;
+  font-family:'DM Sans',sans-serif;
+  font-size:0.83rem;
+  font-weight:500;
+  cursor:pointer;
+  transition:all 0.2s;
+  letter-spacing:0.02em;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{background:#B8945A;border-color:#B8945A;transform:translateY(-1px);}
+.btn:active{transform:translateY(0);}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+.btn-outline{background:transparent;color:var(--gold);}
+.btn-outline:hover{background:rgba(201,169,110,0.08);color:var(--gold);}
+.btn-dark{background:var(--charcoal);border-color:var(--charcoal);}
+.btn-dark:hover{background:var(--charcoal-soft);border-color:var(--charcoal-soft);}
+.btn-sm{padding:0.45rem 1rem;font-size:0.76rem;}
+.btn-lg{padding:0.85rem 2.2rem;font-size:0.88rem;}
+
+/* Flex utils */
+.flex{display:flex;align-items:center;gap:1rem;}
+.flex-between{display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+.flex-end{display:flex;align-items:center;justify-content:flex-end;gap:0.75rem;}
+.mt-1{margin-top:0.5rem;}.mt-2{margin-top:1rem;}.mt-3{margin-top:1.5rem;}.mt-4{margin-top:2rem;}.mt-5{margin-top:2.5rem;}
+
+/* Spinner */
+.spinner{
+  width:18px;height:18px;
+  border:2px solid rgba(201,169,110,0.25);
+  border-top-color:var(--gold);
+  border-radius:50%;
+  animation:spin 0.7s linear infinite;
+  display:inline-block;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Progress */
+.progress-wrap{margin-top:1.2rem;}
+.progress-msg{font-size:0.8rem;color:var(--muted);margin-bottom:8px;display:flex;gap:8px;align-items:center;}
+.progress-bar{height:2px;border-radius:2px;background:var(--border);overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold-light),var(--gold));border-radius:2px;transition:width 0.8s ease;}
+
+/* Edit layout */
+.edit-layout{display:grid;grid-template-columns:1fr 260px;gap:2rem;align-items:start;}
+.slider-group{margin-bottom:1.1rem;}
+.slider-label{display:flex;justify-content:space-between;font-size:0.76rem;color:var(--muted);margin-bottom:5px;}
+.slider-label span:last-child{color:var(--charcoal);font-weight:500;min-width:28px;text-align:right;}
+input[type=range]{
+  width:100%;-webkit-appearance:none;
+  height:3px;border-radius:2px;
+  background:var(--border);outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:15px;height:15px;border-radius:50%;
+  background:var(--gold);cursor:pointer;
+  border:2px solid white;
+  box-shadow:0 1px 4px rgba(0,0,0,0.2);
+  transition:transform 0.15s;
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15);}
+
+.edit-thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.edit-thumb{
+  width:46px;height:46px;border-radius:7px;overflow:hidden;
+  border:2px solid transparent;cursor:pointer;opacity:0.55;transition:all 0.2s;flex-shrink:0;
+}
+.edit-thumb.active-thumb{border-color:var(--gold);opacity:1;}
+.edit-thumb img{width:100%;height:100%;object-fit:cover;}
+
+/* Before/After */
+.ba-wrap{border-radius:14px;overflow:hidden;aspect-ratio:4/5;background:var(--border);position:relative;}
+.ba-wrap img{width:100%;height:100%;object-fit:cover;display:block;}
+.ba-toggle{display:flex;gap:6px;margin-bottom:10px;}
+.ba-btn{flex:1;padding:0.4rem;border-radius:7px;border:1.5px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:0.75rem;color:var(--muted);cursor:pointer;transition:all 0.2s;}
+.ba-btn.active{border-color:var(--gold);color:var(--gold);background:var(--gold-pale);}
+
+/* Notice */
+.notice{
+  background:var(--gold-pale);
+  border:1px solid var(--gold-light);
+  border-radius:10px;
+  padding:0.9rem 1.1rem;
+  font-size:0.8rem;color:var(--muted);line-height:1.7;
+}
+.notice strong{color:var(--charcoal);}
+
+/* Preview grid */
+.feed-preview{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:3px;
+  border-radius:12px;overflow:hidden;
+  border:1px solid var(--border);
+}
+.feed-item{aspect-ratio:4/5;overflow:hidden;background:var(--border);}
+.feed-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s;}
+.feed-item:hover img{transform:scale(1.04);}
+
+/* Count badge */
+.count-badge{
+  display:inline-flex;align-items:center;
+  padding:3px 10px;border-radius:20px;
+  font-size:0.72rem;font-weight:500;
+  background:var(--gold-pale);color:var(--gold);
+  border:1px solid var(--gold-light);
+}
+
+/* Divider */
+.divider{height:1px;background:var(--border);margin:1.5rem 0;}
+
+/* Aesthetic tags */
+.aesthetic-tag{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 10px;border-radius:20px;font-size:0.72rem;
+  border:1px solid var(--gold-light);color:var(--muted);
+  margin:2px;background:var(--gold-pale);
+}
+
+/* Download area */
+.download-area{text-align:center;padding:1.5rem 0;}
+.download-area .serif{font-size:1.1rem;color:var(--muted);margin-bottom:1.5rem;}
+
+/* Responsive */
+@media(max-width:700px){
+  .edit-layout{grid-template-columns:1fr;}
+  .card{padding:1.5rem;}
+  .logo{font-size:2.2rem;}
+  .steps-nav{gap:0;}
+  .step-line{width:20px;}
+  .step-label{display:none;}
+  .grid-5{grid-template-columns:repeat(3,1fr);}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState,useRef,useCallback,useEffect,useMemo}=React;
+const STEPS=['Inspiration','Photos','Curation','Edit','Download'];
+
+function App(){
+  const [step,setStep]=useState(0);
+  const [apiKey,setApiKey]=useState(()=>localStorage.getItem('aurora_key')||'');
+  const [apiSaved,setApiSaved]=useState(()=>!!localStorage.getItem('aurora_key'));
+  const [inspoImages,setInspoImages]=useState([]);
+  const [bulkImages,setBulkImages]=useState([]);
+  const [selectedIds,setSelectedIds]=useState([]);
+  const [scores,setScores]=useState({});
+  const [analyzing,setAnalyzing]=useState(false);
+  const [analyzeProgress,setAnalyzeProgress]=useState(0);
+  const [analyzeMsg,setAnalyzeMsg]=useState('');
+  const [editSettings,setEditSettings]=useState({warmth:15,brightness:5,contrast:10,saturation:8,vibrancy:5,vignette:20,sharpness:30});
+  const [aiEditSettings,setAiEditSettings]=useState(null);
+  const [editingIdx,setEditingIdx]=useState(0);
+  const [inspoAnalysis,setInspoAnalysis]=useState(null);
+  const [downloading,setDownloading]=useState(false);
+  const [error,setError]=useState('');
+
+  const saveKey=()=>{
+    localStorage.setItem('aurora_key',apiKey);
+    setApiSaved(true);
+  };
+
+  const readFile=f=>new Promise(res=>{
+    const r=new FileReader();
+    r.onload=e=>res({id:Math.random().toString(36).slice(2),url:e.target.result,name:f.name,file:f});
+    r.readAsDataURL(f);
+  });
+
+  const handleInspoUpload=useCallback(async(files)=>{
+    const arr=Array.from(files).slice(0,5-inspoImages.length);
+    const imgs=await Promise.all(arr.map(readFile));
+    setInspoImages(p=>[...p,...imgs].slice(0,5));
+  },[inspoImages.length]);
+
+  const handleBulkUpload=useCallback(async(files)=>{
+    const arr=Array.from(files).slice(0,50-bulkImages.length);
+    const imgs=await Promise.all(arr.map(readFile));
+    setBulkImages(p=>[...p,...imgs].slice(0,50));
+  },[bulkImages.length]);
+
+  // Resize image to max 1024px on longest side, return base64 jpeg
+  const resizeImage=useCallback((dataUrl,maxPx=1024)=>new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1,maxPx/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      res(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+    };
+    img.src=dataUrl;
+  }),[]);
+
+  const analyzeWithAI=async()=>{
+    setAnalyzing(true);setAnalyzeProgress(0);setError('');
+    const BATCH=8; // images per API call (safe for token limits)
+    const allScores={}; // id -> score object
+    let inspoAesthetic=null;
+    let aiEdits=null;
+
+    const key=apiKey||localStorage.getItem('aurora_key')||'';
+    const headers={'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+
+    const batches=[];
+    for(let i=0;i<bulkImages.length;i+=BATCH) batches.push(bulkImages.slice(i,i+BATCH));
+    const totalBatches=batches.length;
+
+    const phaseMessages=[
+      'Studying your inspiration aesthetic...',
+      'Analysing colour palette and mood...',
+      'Scoring photos against your style...',
+      'Finalising selections...',
+    ];
+
+    try{
+      // Pre-resize all inspiration images once
+      setAnalyzeMsg('Preparing inspiration images...');
+      const inspoB64=await Promise.all(inspoImages.map(img=>resizeImage(img.url,1024)));
+
+      // Build rich inspo analysis prompt — first call always includes inspo
+      for(let bi=0;bi<batches.length;bi++){
+        const batch=batches[bi];
+        const progress=Math.round(10+(bi/totalBatches)*82);
+        setAnalyzeProgress(progress);
+        setAnalyzeMsg(phaseMessages[Math.min(bi,phaseMessages.length-1)]);
+
+        // Resize batch images
+        const batchB64=await Promise.all(batch.map(img=>resizeImage(img.url,1024)));
+
+        // Build content: inspo images first, then batch candidates
+        const content=[
+          {type:'text',text:`You are an elite Instagram photo curator for Auckland, New Zealand lifestyle and fashion creators.
+
+STEP 1 — Study the next ${inspoImages.length} INSPIRATION image(s) carefully. Extract:
+- Exact colour temperature (warm/cool/neutral)
+- Key colours in the palette (e.g. warm whites, dusty rose, golden beige)
+- Mood and atmosphere (e.g. golden hour, clean minimal, moody editorial)
+- Lighting style (soft natural, harsh, studio, backlit)
+- Composition tendencies (close crop, wide, rule of thirds, centred)
+- Saturation level (muted/desaturated, natural, vibrant)
+- Contrast style (high contrast, soft/low contrast, balanced)
+
+STEP 2 — Score each of the ${batch.length} CANDIDATE image(s) that follow the inspiration images.
+Score 0-100 based on VISUAL match to the inspiration aesthetic. Be strict and use the full range.
+A score of 90+ means it could have been one of the inspiration images.
+A score below 40 means it clashes with the aesthetic (wrong colours, mood, lighting).
+
+Scoring weights:
+- Colour palette & tone match to inspo: 45%
+- Mood, atmosphere & style match: 30%
+- Instagram performance (composition, lighting, visual hierarchy) for Auckland NZ: 15%
+- Technical quality (sharp, well-exposed, no blur): 10%
+
+${bi===0?`STEP 3 — Also provide:
+- aesthetic: short mood and palette description
+- edits: integer adjustments to match the inspo look (warmth -30 to 30, brightness -20 to 20, contrast -20 to 20, saturation -20 to 20, vibrancy -20 to 20, vignette 0 to 40, sharpness 0 to 50)`:''}
+
+Return ONLY valid JSON, no prose, no markdown fences:
+{"scores":[{"index":0,"score":78,"reason":"Similar warm tones but composition too busy"}]${bi===0?`,"aesthetic":{"mood":"warm golden lifestyle","palette":"creamy whites, warm beige, soft gold"},"edits":{"warmth":20,"brightness":5,"contrast":8,"saturation":6,"vibrancy":4,"vignette":18,"sharpness":32}`:''}}`},
+          ...inspoB64.map(b64=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}})),
+          ...batchB64.map(b64=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}})),
+        ];
+
+        const res=await fetch('https://api.anthropic.com/v1/messages',{
+          method:'POST',headers,
+          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content}]})
+        });
+        if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error '+res.status);}
+        const data=await res.json();
+        const text=data.content.map(c=>c.text||'').join('');
+        const clean=text.replace(/```json|```/g,'').trim();
+        const parsed=JSON.parse(clean);
+
+        // Map batch-local index (0..BATCH-1) back to global bulkImages index
+        parsed.scores.forEach(s=>{
+          const globalImg=batch[s.index];
+          if(globalImg) allScores[globalImg.id]={...s,globalIndex:bulkImages.findIndex(x=>x.id===globalImg.id)};
+        });
+
+        if(bi===0){
+          if(parsed.aesthetic) inspoAesthetic=parsed.aesthetic;
+          if(parsed.edits) aiEdits=parsed.edits;
+        }
+      }
+
+      setAnalyzeProgress(98);setAnalyzeMsg('Selecting your best images...');
+
+      // Rank all scored images, pick top 5-10
+      const scored=Object.entries(allScores).map(([id,s])=>({id,...s}));
+      const sorted=scored.sort((a,b)=>b.score-a.score);
+      const topN=Math.min(Math.max(5,Math.ceil(bulkImages.length*0.2)),10);
+      const topIds=sorted.slice(0,topN).map(s=>s.id);
+
+      setScores(allScores);
+      setSelectedIds(topIds);
+      setInspoAnalysis(inspoAesthetic);
+      if(aiEdits){setAiEditSettings(aiEdits);setEditSettings(aiEdits);}
+      setAnalyzeProgress(100);
+      setTimeout(()=>{setAnalyzing(false);setStep(2);},500);
+
+    }catch(e){
+      setAnalyzing(false);
+      setError('Analysis failed: '+e.message+'. Please check your API key and try again.');
+    }
+  };
+
+  const toggleSelect=useCallback(id=>{
+    setSelectedIds(p=>{
+      if(p.includes(id)){return p.length>1?p.filter(x=>x!==id):p;}
+      return [...p,id];
+    });
+  },[]);
+
+  const applyEdits=(canvas,img,settings)=>{
+    canvas.width=img.naturalWidth||img.width;
+    canvas.height=img.naturalHeight||img.height;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img,0,0);
+    const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const d=imageData.data;
+    const warm=settings.warmth/100;
+    const bright=(settings.brightness/100)*255;
+    const cont=1+(settings.contrast/50);
+    const sat=1+(settings.saturation/80);
+    const vib=settings.vibrancy/200;
+    for(let i=0;i<d.length;i+=4){
+      let r=d[i],g=d[i+1],b=d[i+2];
+      r=Math.min(255,r+(warm*35));
+      b=Math.max(0,b-(warm*25));
+      g=Math.min(255,g+(warm*8));
+      r=Math.min(255,Math.max(0,(r-128)*cont+128+bright));
+      g=Math.min(255,Math.max(0,(g-128)*cont+128+bright));
+      b=Math.min(255,Math.max(0,(b-128)*cont+128+bright));
+      const gray=0.2126*r+0.7152*g+0.0722*b;
+      r=Math.max(0,Math.min(255,gray+(r-gray)*sat));
+      g=Math.max(0,Math.min(255,gray+(g-gray)*sat));
+      b=Math.max(0,Math.min(255,gray+(b-gray)*sat));
+      const maxC=Math.max(r,g,b);
+      if(maxC<220&&vib>0){
+        const dist=(220-maxC)/255;
+        r=Math.min(255,r+(dist*vib*50));
+        g=Math.min(255,g+(dist*vib*30));
+      }
+      d[i]=r;d[i+1]=g;d[i+2]=b;
+    }
+    if(settings.vignette>0){
+      const cx=canvas.width/2,cy=canvas.height/2;
+      const maxD=Math.sqrt(cx*cx+cy*cy);
+      const str=settings.vignette/80;
+      const imgData2=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const d2=imageData.data;
+      for(let y=0;y<canvas.height;y++){
+        for(let x=0;x<canvas.width;x++){
+          const idx=(y*canvas.width+x)*4;
+          const dist=Math.sqrt((x-cx)**2+(y-cy)**2)/maxD;
+          const factor=Math.max(0,1-Math.pow(dist,1.8)*str*2);
+          d2[idx]=Math.round(d2[idx]*factor);
+          d2[idx+1]=Math.round(d2[idx+1]*factor);
+          d2[idx+2]=Math.round(d2[idx+2]*factor);
+        }
+      }
+      ctx.putImageData(imageData,0,0);
+    }else{
+      ctx.putImageData(imageData,0,0);
+    }
+    return canvas.toDataURL('image/jpeg',0.97);
+  };
+
+  const downloadAll=async()=>{
+    setDownloading(true);
+    const zip=new JSZip();
+    const canvas=document.createElement('canvas');
+    const selected=bulkImages.filter(i=>selectedIds.includes(i.id));
+    for(let idx=0;idx<selected.length;idx++){
+      const item=selected[idx];
+      await new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+          const dataUrl=applyEdits(canvas,img,editSettings);
+          const b64=dataUrl.split(',')[1];
+          const ext=item.name.split('.').pop()||'jpg';
+          zip.file(`aurora_${String(idx+1).padStart(2,'0')}_${item.name}`,b64,{base64:true});
+          res();
+        };
+        img.src=item.url;
+      });
+    }
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='aurora_curated.zip';
+    a.click();
+    setDownloading(false);
+  };
+
+  const selectedImages=useMemo(()=>bulkImages.filter(i=>selectedIds.includes(i.id)),[bulkImages,selectedIds]);
+  const editImg=selectedImages[editingIdx];
+
+  return(
+    <div className="app">
+      <div className="header">
+        <div className="logo">aur<span className="logo-accent">o</span>ra</div>
+        <div className="tagline">AI-powered Instagram curation · Auckland, NZ</div>
+      </div>
+
+      {!apiSaved&&(
+        <div className="api-setup">
+          <div className="api-setup-title">Anthropic API Key</div>
+          <div className="api-row">
+            <input className="api-input" type="password" placeholder="sk-ant-..." value={apiKey}
+              onChange={e=>setApiKey(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&apiKey)saveKey();}}/>
+            <button className="btn btn-sm" disabled={!apiKey} onClick={saveKey}>Save</button>
+          </div>
+          <div className="api-note">
+            Your key is stored locally and never sent to any server except Anthropic.<br/>
+            Get yours at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+          </div>
+        </div>
+      )}
+      {apiSaved&&(
+        <div style={{textAlign:'center',marginBottom:'1.5rem'}}>
+          <span className="aesthetic-tag">✦ API key saved · <span onClick={()=>{setApiSaved(false);setApiKey('');localStorage.removeItem('aurora_key');}} style={{cursor:'pointer',color:'var(--gold)'}}>change</span></span>
+        </div>
+      )}
+
+      <div className="steps-nav">
+        {STEPS.map((s,i)=>(
+          <div key={s} className="step-item">
+            <div className={`step-dot ${i===step?'active':i<step?'done':''}`}
+              onClick={()=>{if(i<step)setStep(i);}}>
+              {i<step?'✓':i+1}
+            </div>
+            <span className={`step-label ${i===step?'active':''}`}>{s}</span>
+            {i<STEPS.length-1&&<div className="step-line"/>}
+          </div>
+        ))}
+      </div>
+
+      {/* STEP 0 — INSPIRATION */}
+      {step===0&&(
+        <div className="card">
+          <div className="section-title">Set your aesthetic</div>
+          <p className="section-sub">Upload 1–5 inspiration images that define the look, feel, and mood you want. These guide everything — selection, editing, and colour grading.</p>
+          <DropZone onFiles={handleInspoUpload} label="Drop inspiration images here" disabled={inspoImages.length>=5}/>
+          {inspoImages.length>0&&(
+            <div className="img-grid grid-5 mt-2">
+              {inspoImages.map(img=>(
+                <div key={img.id} className="img-thumb">
+                  <img src={img.url} alt="inspo"/>
+                  <button className="remove-btn" onClick={()=>setInspoImages(p=>p.filter(x=>x.id!==img.id))}>✕</button>
+                </div>
+              ))}
+              {inspoImages.length<5&&Array.from({length:5-inspoImages.length}).map((_,i)=>(
+                <div key={i} style={{aspectRatio:'1',borderRadius:'10px',border:'1.5px dashed var(--border)',background:'var(--surface-warm)'}}/>
+              ))}
+            </div>
+          )}
+          <div style={{marginTop:'0.8rem',fontSize:'0.75rem',color:'var(--muted-light)'}}>
+            {inspoImages.length}/5 inspiration images added
+          </div>
+          <div className="flex-end mt-4">
+            <button className="btn" disabled={inspoImages.length===0} onClick={()=>setStep(1)}>
+              Continue ›
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 1 — BULK UPLOAD */}
+      {step===1&&(
+        <div className="card">
+          <div className="flex-between">
+            <div>
+              <div className="section-title">Upload your photos</div>
+              <p className="section-sub">Add up to 50 images. Aurora will score each one against your inspiration aesthetic and select the best performers for Auckland audiences.</p>
+            </div>
+            <span className="count-badge">{bulkImages.length}/50</span>
+          </div>
+          <DropZone onFiles={handleBulkUpload} label="Drop up to 50 photos here" multiple disabled={bulkImages.length>=50}/>
+          {bulkImages.length>0&&(
+            <div className="img-grid grid-auto mt-2">
+              {bulkImages.map(img=>(
+                <div key={img.id} className="img-thumb">
+                  <img src={img.url} alt={img.name}/>
+                  <button className="remove-btn" onClick={()=>setBulkImages(p=>p.filter(x=>x.id!==img.id))}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {error&&<div className="notice mt-3" style={{borderColor:'#E8B4B4',background:'#FDF5F5',color:'#8B4040'}}>{error}</div>}
+          {analyzing&&(
+            <div className="progress-wrap">
+              <div className="progress-msg"><div className="spinner"/>{analyzeMsg||'Analysing images...'}</div>
+              <div className="progress-bar"><div className="progress-fill" style={{width:analyzeProgress+'%'}}/></div>
+              <div style={{fontSize:'0.72rem',color:'var(--muted-light)',marginTop:6}}>
+                Scoring all {bulkImages.length} photos against your inspiration — this takes 30–90 seconds
+              </div>
+            </div>
+          )}
+          <div className="flex-between mt-4">
+            <button className="btn btn-outline btn-sm" onClick={()=>setStep(0)}>‹ Back</button>
+            <button className="btn" disabled={bulkImages.length<2||analyzing} onClick={analyzeWithAI}>
+              {analyzing?<><div className="spinner"/>Analysing...</>:'Analyse & Curate ›'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2 — CURATION */}
+      {step===2&&(
+        <div className="card">
+          <div className="flex-between">
+            <div>
+              <div className="section-title">AI selection</div>
+              <p className="section-sub">Aurora chose the top images based on your aesthetic and Auckland Instagram performance. Tap any image to include or exclude it.</p>
+            </div>
+            <span className="count-badge">{selectedIds.length} selected</span>
+          </div>
+          {inspoAnalysis&&(
+            <div className="notice mt-2">
+              <strong>Detected aesthetic:</strong> {inspoAnalysis.mood}
+              {inspoAnalysis.palette&&<> · {inspoAnalysis.palette}</>}
+            </div>
+          )}
+          <div className="img-grid grid-auto-lg mt-3">
+            {bulkImages.map(img=>{
+              const sel=selectedIds.includes(img.id);
+              const sc=scores[img.id];
+              return(
+                <div key={img.id} className={`img-thumb clickable ${sel?'selected':'dimmed'}`} onClick={()=>toggleSelect(img.id)}>
+                  <img src={img.url} alt={img.name}/>
+                  {sc&&<div className="score-badge">{Math.round(sc.score)}</div>}
+                  {sel&&<div className="check">✓</div>}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex-between mt-4">
+            <button className="btn btn-outline btn-sm" onClick={()=>setStep(1)}>‹ Back</button>
+            <button className="btn" onClick={()=>{setEditingIdx(0);setStep(3);}}>Edit selection ›</button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3 — EDIT */}
+      {step===3&&(
+        <div className="card">
+          <div className="section-title">Refine edits</div>
+          <p className="section-sub">AI has applied colour grading matched to your inspiration. Adjust with the sliders — changes apply to all images on download.</p>
+          <div className="edit-layout mt-3">
+            <div>
+              <div className="ba-toggle">
+                <BeforeAfterToggle img={editImg} settings={editSettings} applyEdits={applyEdits}/>
+              </div>
+              <div className="edit-thumbs">
+                {selectedImages.map((img,i)=>(
+                  <div key={img.id} className={`edit-thumb ${i===editingIdx?'active-thumb':''}`} onClick={()=>setEditingIdx(i)}>
+                    <img src={img.url} alt=""/>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:'0.7rem',letterSpacing:'0.12em',textTransform:'uppercase',color:'var(--muted-light)',marginBottom:'1rem'}}>Adjustments</div>
+              {[
+                {k:'warmth',label:'Warmth',min:-30,max:30},
+                {k:'brightness',label:'Brightness',min:-20,max:20},
+                {k:'contrast',label:'Contrast',min:-20,max:20},
+                {k:'saturation',label:'Saturation',min:-20,max:20},
+                {k:'vibrancy',label:'Vibrancy',min:-20,max:20},
+                {k:'vignette',label:'Vignette',min:0,max:40},
+                {k:'sharpness',label:'Sharpness',min:0,max:50},
+              ].map(({k,label,min,max})=>(
+                <div key={k} className="slider-group">
+                  <div className="slider-label">
+                    <span>{label}</span>
+                    <span>{editSettings[k]}</span>
+                  </div>
+                  <input type="range" min={min} max={max} step={1} value={editSettings[k]}
+                    onChange={e=>setEditSettings(p=>({...p,[k]:Number(e.target.value)}))}/>
+                </div>
+              ))}
+              {aiEditSettings&&(
+                <button className="btn btn-outline btn-sm mt-2" style={{width:'100%'}}
+                  onClick={()=>setEditSettings(aiEditSettings)}>
+                  Reset to AI suggestion
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex-between mt-4">
+            <button className="btn btn-outline btn-sm" onClick={()=>setStep(2)}>‹ Back</button>
+            <button className="btn" onClick={()=>setStep(4)}>Preview & download ›</button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4 — DOWNLOAD */}
+      {step===4&&(
+        <div className="card">
+          <div className="section-title">Ready to post</div>
+          <p className="section-sub">{selectedImages.length} images curated and edited. Exported at full original resolution — no quality loss.</p>
+          <div className="feed-preview mt-3">
+            {selectedImages.map((img,i)=>(
+              <div key={img.id} className="feed-item"><img src={img.url} alt={`Selected ${i+1}`}/></div>
+            ))}
+          </div>
+          <div className="notice mt-3">
+            <strong>Export note:</strong> All edits (warmth, contrast, vignette, etc.) are baked in at full resolution on download. The preview above shows original crops — final files include all adjustments.
+          </div>
+          <div style={{display:'flex',justifyContent:'center',gap:'0.75rem',marginTop:'1.8rem',flexWrap:'wrap'}}>
+            <button className="btn btn-outline" onClick={()=>setStep(3)}>‹ Tweak edits</button>
+            <button className="btn btn-dark btn-lg" disabled={downloading} onClick={downloadAll}>
+              {downloading?<><div className="spinner"/>Preparing ZIP...</>:'Download all images ↓'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{textAlign:'center',marginTop:'3rem',fontSize:'0.7rem',color:'var(--muted-light)',letterSpacing:'0.1em'}}>
+        Aurora · Built for Auckland creators · Powered by Claude AI
+      </div>
+    </div>
+  );
+}
+
+function DropZone({onFiles,label,disabled,multiple}){
+  const ref=useRef();
+  const [drag,setDrag]=useState(false);
+  const onDrop=e=>{
+    e.preventDefault();setDrag(false);
+    if(!disabled&&e.dataTransfer.files.length)onFiles(e.dataTransfer.files);
+  };
+  return(
+    <div className={`upload-zone ${drag?'dragging':''} ${disabled?'disabled':''}`}
+      onDragOver={e=>{e.preventDefault();if(!disabled)setDrag(true);}}
+      onDragLeave={()=>setDrag(false)}
+      onDrop={onDrop}
+      onClick={()=>!disabled&&ref.current.click()}>
+      <input ref={ref} type="file" accept="image/*" multiple={multiple}
+        onChange={e=>{if(!disabled)onFiles(e.target.files);e.target.value='';}}/>
+      <div className="upload-icon">+</div>
+      <div className="upload-text">
+        <strong>{label}</strong><br/>
+        Click to browse or drag &amp; drop · {multiple?'JPEG, PNG, HEIC':'JPEG, PNG'}
+      </div>
+      {disabled&&<div style={{fontSize:'0.75rem',color:'var(--muted-light)',marginTop:'0.5rem'}}>Maximum reached</div>}
+    </div>
+  );
+}
+
+function BeforeAfterToggle({img,settings,applyEdits}){
+  const [view,setView]=useState('after');
+  const [editedUrl,setEditedUrl]=useState(null);
+  useEffect(()=>{
+    if(!img)return;
+    const image=new Image();
+    image.onload=()=>{
+      const c=document.createElement('canvas');
+      setEditedUrl(applyEdits(c,image,settings));
+    };
+    image.src=img.url;
+  },[img,settings]);
+  if(!img)return null;
+  return(
+    <>
+      <div style={{display:'flex',gap:6,marginBottom:10}}>
+        {['before','after'].map(v=>(
+          <button key={v} className={`ba-btn ${view===v?'active':''}`} onClick={()=>setView(v)}>
+            {v.charAt(0).toUpperCase()+v.slice(1)}
+          </button>
+        ))}
+      </div>
+      <div className="ba-wrap">
+        <img src={view==='after'&&editedUrl?editedUrl:img.url} alt="preview"/>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById('root'));
+</script>
+</body>
+</html>
