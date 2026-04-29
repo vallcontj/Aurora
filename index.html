@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurora — AI Instagram Curator</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--cream:#FAF8F5;--gold:#C9A96E;--gold-light:#E8D5B0;--charcoal:#2C2420;--muted:#8B7355;--border:#E8E0D0;--surface:#FFF}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);min-height:100vh}
+.app{max-width:1080px;margin:0 auto;padding:0 1.5rem 4rem}
+.header{text-align:center;padding:3rem 0 2rem}
+.logo{font-family:'Cormorant Garamond',serif;font-size:2.8rem;font-weight:300;letter-spacing:0.18em}
+.logo-accent{color:var(--gold)}
+.tagline{font-size:0.72rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--muted);margin-top:0.6rem}
+.api-setup{max-width:480px;margin:0 auto 2rem;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem}
+.api-title{font-size:0.72rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:0.8rem}
+.api-row{display:flex;gap:8px}
+.api-input{flex:1;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;outline:none}
+.api-input:focus{border-color:var(--gold)}
+.api-note{font-size:0.72rem;color:var(--muted);margin-top:0.5rem;line-height:1.5}
+.api-note a{color:var(--gold);text-decoration:none}
+.steps-nav{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:2.5rem;flex-wrap:wrap}
+.step-item{display:flex;align-items:center}
+.step-dot{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--muted);transition:all 0.3s}
+.step-dot.active{border-color:var(--gold);background:var(--gold);color:white}
+.step-label{font-size:0.71rem;color:var(--muted);margin-left:7px}
+.step-label.active{color:var(--charcoal);font-weight:500}
+.step-line{width:36px;height:1px;background:var(--border);margin:0 6px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2.2rem 2.5rem;box-shadow:0 2px 20px rgba(44,36,32,0.04)}
+.section-title{font-family:'Cormorant Garamond',serif;font-size:1.7rem;margin-bottom:0.4rem}
+.section-sub{font-size:0.82rem;color:var(--muted);line-height:1.7;margin-bottom:1.8rem}
+.upload-zone{border:1.5px dashed var(--gold-light);border-radius:14px;padding:2.8rem 2rem;text-align:center;cursor:pointer;transition:all 0.25s;background:rgba(201,169,110,0.02)}
+.upload-zone:hover{border-color:var(--gold);background:rgba(201,169,110,0.06)}
+.upload-zone input{display:none}
+.upload-icon{font-size:2rem;margin-bottom:0.8rem;color:var(--gold)}
+.upload-text{font-size:0.83rem;color:var(--muted)}
+.upload-text strong{color:var(--charcoal)}
+.img-grid{display:grid;gap:10px;margin-top:1.2rem}
+.grid-5{grid-template-columns:repeat(5,1fr)}
+.grid-auto{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.img-thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:2px solid transparent;transition:all 0.2s}
+.img-thumb img{width:100%;height:100%;object-fit:cover}
+.img-thumb .remove-btn{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;background:rgba(44,36,32,0.7);color:white;border:none;cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s}
+.img-thumb:hover .remove-btn{opacity:1}
+.img-thumb.selected{border-color:var(--gold)}
+.img-thumb.dimmed{opacity:0.35}
+.img-thumb.clickable{cursor:pointer}
+.score-badge{position:absolute;top:5px;left:5px;background:var(--gold);color:white;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:600}
+.btn{padding:0.65rem 1.6rem;border-radius:9px;border:1.5px solid var(--gold);background:var(--gold);color:white;font-size:0.83rem;font-weight:500;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:#B8945A;border-color:#B8945A}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--gold)}
+.btn-outline:hover{background:rgba(201,169,110,0.08)}
+.btn-sm{padding:0.45rem 1rem;font-size:0.76rem}
+.btn-dark{background:var(--charcoal);border-color:var(--charcoal)}
+.btn-dark:hover{background:#1a1410;border-color:#1a1410}
+.flex-between{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.mt-2{margin-top:1rem}.mt-3{margin-top:1.5rem}.mt-4{margin-top:2rem}
+.spinner{width:18px;height:18px;border:2px solid rgba(201,169,110,0.25);border-top-color:var(--gold);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-wrap{margin-top:1.2rem}
+.progress-msg{font-size:0.8rem;color:var(--muted);margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.progress-bar{height:2px;border-radius:2px;background:var(--border);overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold-light),var(--gold));transition:width 0.8s}
+.notice{background:rgba(201,169,110,0.08);border:1px solid var(--gold-light);border-radius:10px;padding:0.9rem 1.1rem;font-size:0.8rem;color:var(--muted);line-height:1.7}
+.notice strong{color:var(--charcoal)}
+.count-badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:0.72rem;font-weight:500;background:rgba(201,169,110,0.12);color:var(--gold);border:1px solid var(--gold-light)}
+.edit-layout{display:grid;grid-template-columns:1fr 260px;gap:2rem;align-items:start}
+.slider-group{margin-bottom:1.1rem}
+.slider-label{display:flex;justify-content:space-between;font-size:0.76rem;color:var(--muted);margin-bottom:5px}
+.slider-label span:last-child{color:var(--charcoal);font-weight:500}
+input[type=range]{width:100%;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--gold);cursor:pointer;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.2)}
+.ba-wrap{border-radius:14px;overflow:hidden;aspect-ratio:4/5;background:var(--border)}
+.ba-wrap img{width:100%;height:100%;object-fit:cover}
+.ba-toggle{display:flex;gap:6px;margin-bottom:10px}
+.ba-btn{flex:1;padding:0.4rem;border-radius:7px;border:1.5px solid var(--border);background:transparent;font-size:0.75rem;color:var(--muted);cursor:pointer;transition:all 0.2s}
+.ba-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(201,169,110,0.08)}
+.edit-thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.edit-thumb{width:46px;height:46px;border-radius:7px;overflow:hidden;border:2px solid transparent;cursor:pointer;opacity:0.55;transition:all 0.2s}
+.edit-thumb.active-thumb{border-color:var(--gold);opacity:1}
+.edit-thumb img{width:100%;height:100%;object-fit:cover}
+.feed-preview{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.feed-item{aspect-ratio:4/5;overflow:hidden}
+.feed-item img{width:100%;height:100%;object-fit:cover}
+@media(max-width:700px){.edit-layout{grid-template-columns:1fr}.card{padding:1.5rem}.grid-5{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState,useRef,useCallback,useEffect}=React;
+const STEPS=['Inspiration','Photos','Curation','Edit','Download'];
+
+function App(){
+  const [step,setStep]=useState(0);
+  const [apiKey,setApiKey]=useState(()=>localStorage.getItem('aurora_key')||'');
+  const [apiSaved,setApiSaved]=useState(()=>!!localStorage.getItem('aurora_key'));
+  const [inspoImages,setInspoImages]=useState([]);
+  const [bulkImages,setBulkImages]=useState([]);
+  const [selectedIds,setSelectedIds]=useState([]);
+  const [scores,setScores]=useState({});
+  const [analyzing,setAnalyzing]=useState(false);
+  const [analyzeProgress,setAnalyzeProgress]=useState(0);
+  const [analyzeMsg,setAnalyzeMsg]=useState('');
+  const [editSettings,setEditSettings]=useState({warmth:15,brightness:5,contrast:10,saturation:8,vibrancy:5,vignette:20,sharpness:30});
+  const [aiEditSettings,setAiEditSettings]=useState(null);
+  const [editingIdx,setEditingIdx]=useState(0);
+  const [inspoAnalysis,setInspoAnalysis]=useState(null);
+  const [downloading,setDownloading]=useState(false);
+  const [error,setError]=useState('');
+
+  const saveKey=()=>{localStorage.setItem('aurora_key',apiKey);setApiSaved(true);};
+
+  const readFile=f=>new Promise(res=>{
+    const r=new FileReader();
+    r.onload=e=>res({id:Math.random().toString(36).slice(2),url:e.target.result,name:f.name});
+    r.readAsDataURL(f);
+  });
+
+  const handleInspoUpload=useCallback(async(files)=>{
+    const arr=Array.from(files).slice(0,5-inspoImages.length);
+    const imgs=await Promise.all(arr.map(readFile));
+    setInspoImages(p=>[...p,...imgs].slice(0,5));
+  },[inspoImages.length]);
+
+  const handleBulkUpload=useCallback(async(files)=>{
+    const arr=Array.from(files).slice(0,50-bulkImages.length);
+    const imgs=await Promise.all(arr.map(readFile));
+    setBulkImages(p=>[...p,...imgs].slice(0,50));
+  },[bulkImages.length]);
+
+  const resizeImage=(dataUrl,maxPx=1024)=>new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1,maxPx/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      res(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+    };
+    img.src=dataUrl;
+  });
+
+  const analyzeWithAI=async()=>{
+    setAnalyzing(true);setAnalyzeProgress(0);setError('');
+    const key=(apiKey||localStorage.getItem('aurora_key')||'').trim();
+    if(!key){setAnalyzing(false);setError('Please enter your Gemini API key from aistudio.google.com');return;}
+
+    const BATCH=8;
+    const allScores={};
+    let inspoAesthetic=null,aiEdits=null;
+    const batches=[];
+    for(let i=0;i<bulkImages.length;i+=BATCH)batches.push(bulkImages.slice(i,i+BATCH));
+
+    const msgs=['Preparing images...','Analysing aesthetic...','Scoring photos...','Finalising...'];
+    try{
+      setAnalyzeMsg(msgs[0]);
+      const inspoB64=await Promise.all(inspoImages.map(img=>resizeImage(img.url,1024)));
+
+      for(let bi=0;bi<batches.length;bi++){
+        const batch=batches[bi];
+        setAnalyzeProgress(Math.round(10+(bi/batches.length)*82));
+        setAnalyzeMsg(msgs[Math.min(bi,msgs.length-1)]);
+
+        const batchB64=await Promise.all(batch.map(img=>resizeImage(img.url,1024)));
+        
+        const prompt=`You are an Instagram curator for Auckland NZ lifestyle/fashion.
+
+STEP 1: Study the first ${inspoImages.length} INSPIRATION images. Extract colour temperature, key colours, mood, lighting style, saturation, contrast.
+
+STEP 2: Score the next ${batch.length} CANDIDATE images (0-100) on VISUAL match to inspiration aesthetic. 90+=perfect match, <40=clashes.
+Weights: colour/tone 45%, mood/style 30%, Instagram performance 15%, technical quality 10%.
+
+${bi===0?`STEP 3: Provide aesthetic (mood & palette) and edits (warmth -30 to 30, brightness -20 to 20, contrast -20 to 20, saturation -20 to 20, vibrancy -20 to 20, vignette 0-40, sharpness 0-50).`:''}
+
+Return ONLY JSON:
+{"scores":[{"index":0,"score":85,"reason":"warm tones match"}]${bi===0?`,"aesthetic":{"mood":"golden hour","palette":"warm whites, beige"},"edits":{"warmth":18,"brightness":5,"contrast":10,"saturation":8,"vibrancy":5,"vignette":20,"sharpness":32}`:''}}`
+
+        const parts=[
+          {text:prompt},
+          ...inspoB64.map(b64=>({inline_data:{mime_type:'image/jpeg',data:b64}})),
+          ...batchB64.map(b64=>({inline_data:{mime_type:'image/jpeg',data:b64}})),
+        ];
+
+        const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${key}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:0.1,maxOutputTokens:1000}})
+        });
+
+        if(!res.ok){
+          const txt=await res.text();
+          throw new Error(`API error ${res.status}: ${txt.slice(0,200)}`);
+        }
+
+        const data=await res.json();
+        const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        const clean=raw.replace(/```json|```/g,'').trim();
+        const parsed=JSON.parse(clean);
+
+        parsed.scores.forEach(s=>{
+          const globalImg=batch[s.index];
+          if(globalImg)allScores[globalImg.id]={...s};
+        });
+
+        if(bi===0){
+          if(parsed.aesthetic)inspoAesthetic=parsed.aesthetic;
+          if(parsed.edits)aiEdits=parsed.edits;
+        }
+      }
+
+      setAnalyzeProgress(100);
+      const scored=Object.entries(allScores).map(([id,s])=>({id,...s})).sort((a,b)=>b.score-a.score);
+      const topN=Math.min(Math.max(5,Math.ceil(bulkImages.length*0.2)),10);
+      setScores(allScores);
+      setSelectedIds(scored.slice(0,topN).map(s=>s.id));
+      setInspoAnalysis(inspoAesthetic);
+      if(aiEdits){setAiEditSettings(aiEdits);setEditSettings(aiEdits);}
+      setTimeout(()=>{setAnalyzing(false);setStep(2);},500);
+
+    }catch(e){
+      setAnalyzing(false);
+      setError('Analysis failed: '+e.message);
+    }
+  };
+
+  const toggleSelect=id=>setSelectedIds(p=>p.includes(id)?(p.length>1?p.filter(x=>x!==id):p):[...p,id]);
+
+  const applyEdits=(canvas,img,settings)=>{
+    canvas.width=img.naturalWidth||img.width;
+    canvas.height=img.naturalHeight||img.height;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img,0,0);
+    const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const d=imageData.data;
+    const warm=settings.warmth/100,bright=settings.brightness/100*255,cont=1+settings.contrast/50,sat=1+settings.saturation/80;
+    for(let i=0;i<d.length;i+=4){
+      let r=d[i],g=d[i+1],b=d[i+2];
+      r=Math.min(255,r+warm*35);b=Math.max(0,b-warm*25);g=Math.min(255,g+warm*8);
+      r=Math.min(255,Math.max(0,(r-128)*cont+128+bright));
+      g=Math.min(255,Math.max(0,(g-128)*cont+128+bright));
+      b=Math.min(255,Math.max(0,(b-128)*cont+128+bright));
+      const gray=0.2126*r+0.7152*g+0.0722*b;
+      r=Math.max(0,Math.min(255,gray+(r-gray)*sat));
+      g=Math.max(0,Math.min(255,gray+(g-gray)*sat));
+      b=Math.max(0,Math.min(255,gray+(b-gray)*sat));
+      d[i]=r;d[i+1]=g;d[i+2]=b;
+    }
+    if(settings.vignette>0){
+      const cx=canvas.width/2,cy=canvas.height/2,maxD=Math.sqrt(cx*cx+cy*cy),str=settings.vignette/80;
+      for(let y=0;y<canvas.height;y++){
+        for(let x=0;x<canvas.width;x++){
+          const i=(y*canvas.width+x)*4,dist=Math.sqrt((x-cx)**2+(y-cy)**2)/maxD,factor=1-Math.pow(dist,1.8)*str*2;
+          d[i]*=factor;d[i+1]*=factor;d[i+2]*=factor;
+        }
+      }
+    }
+    ctx.putImageData(imageData,0,0);
+    return canvas.toDataURL('image/jpeg',0.97);
+  };
+
+  const downloadAll=async()=>{
+    setDownloading(true);
+    const zip=new JSZip();
+    const canvas=document.createElement('canvas');
+    const selected=bulkImages.filter(i=>selectedIds.includes(i.id));
+    for(let idx=0;idx<selected.length;idx++){
+      const item=selected[idx];
+      await new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+          const url=applyEdits(canvas,img,editSettings);
+          zip.file(`aurora_${String(idx+1).padStart(2,'0')}_${item.name}`,url.split(',')[1],{base64:true});
+          res();
+        };
+        img.src=item.url;
+      });
+    }
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download='aurora_curated.zip';a.click();
+    setDownloading(false);
+  };
+
+  const selectedImages=bulkImages.filter(i=>selectedIds.includes(i.id));
+  const editImg=selectedImages[editingIdx];
+
+  return(
+    <div className="app">
+      <div className="header">
+        <div className="logo">aur<span className="logo-accent">o</span>ra</div>
+        <div className="tagline">AI Instagram Curator · Free with Gemini</div>
+      </div>
+
+      {!apiSaved&&(
+        <div className="api-setup">
+          <div className="api-title">Gemini API Key (free, no credit card)</div>
+          <div className="api-row">
+            <input className="api-input" type="password" placeholder="AIza..." value={apiKey}
+              onChange={e=>setApiKey(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&apiKey)saveKey();}}/>
+            <button className="btn btn-sm" disabled={!apiKey} onClick={saveKey}>Save</button>
+          </div>
+          <div className="api-note">
+            Get free at <a href="https://aistudio.google.com" target="_blank" rel="noopener">aistudio.google.com</a> → Get API Key
+          </div>
+        </div>
+      )}
+
+      <div className="steps-nav">
+        {STEPS.map((s,i)=>(
+          <div key={s} className="step-item">
+            <div className={`step-dot ${i===step?'active':''}`}>{i+1}</div>
+            <span className={`step-label ${i===step?'active':''}`}>{s}</span>
+            {i<STEPS.length-1&&<div className="step-line"/>}
+          </div>
+        ))}
+      </div>
+
+      {step===0&&(
+        <div className="card">
+          <div className="section-title">Set your aesthetic</div>
+          <p className="section-sub">Upload 1–5 inspiration images that define your look and feel.</p>
+          <DropZone onFiles={handleInspoUpload} label="Drop inspiration images" disabled={inspoImages.length>=5}/>
+          {inspoImages.length>0&&(
+            <div className="img-grid grid-5 mt-2">
+              {inspoImages.map(img=>(
+                <div key={img.id} className="img-thumb">
+                  <img src={img.url} alt="inspo"/>
+                  <button className="remove-btn" onClick={()=>setInspoImages(p=>p.filter(x=>x.id!==img.id))}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex-between mt-4">
+            <div style={{fontSize:'0.75rem',color:'var(--muted)'}}>{inspoImages.length}/5</div>
+            <button className="btn" disabled={inspoImages.length===0} onClick={()=>setStep(1)}>Continue →</button>
+          </div>
+        </div>
+      )}
+
+      {step===1&&(
+        <div className="card">
+          <div className="flex-between">
+            <div>
+              <div className="section-title">Upload photos</div>
+              <p className="section-sub">Add up to 50 images to curate.</p>
+            </div>
+            <span className="count-badge">{bulkImages.length}/50</span>
+          </div>
+          <DropZone onFiles={handleBulkUpload} label="Drop photos" multiple disabled={bulkImages.length>=50}/>
+          {bulkImages.length>0&&(
+            <div className="img-grid grid-auto mt-2">
+              {bulkImages.map(img=>(
+                <div key={img.id} className="img-thumb">
+                  <img src={img.url} alt={img.name}/>
+                  <button className="remove-btn" onClick={()=>setBulkImages(p=>p.filter(x=>x.id!==img.id))}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {error&&<div className="notice mt-3" style={{borderColor:'#E8B4B4',background:'#FDF5F5',color:'#8B4040'}}>{error}</div>}
+          {analyzing&&(
+            <div className="progress-wrap">
+              <div className="progress-msg"><div className="spinner"/>{analyzeMsg}</div>
+              <div className="progress-bar"><div className="progress-fill" style={{width:analyzeProgress+'%'}}/></div>
+            </div>
+          )}
+          <div className="flex-between mt-4">
+            <button className="btn btn-outline btn-sm" onClick={()=>setStep(0)}>← Back</button>
+            <button className="btn" disabled={bulkImages.length<2||analyzing} onClick={analyzeWithAI}>
+              {analyzing?<><div className="spinner"/>Analysing...</>:'Analyse & Curate →'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step===2&&(
+        <div className="card">
+          <div className="flex-between">
+            <div>
+              <div className="section-title">AI Selection</div>
+              <p className="section-sub">Top images selected. Tap to include/exclude.</p>
+            </div>
+            <span className="count-badge">{selectedIds.length} selected</span>
+          </div>
+          {inspoAnalysis&&(
+            <div className="notice mt-2">
+              <strong>Aesthetic:</strong> {inspoAnalysis.mood} · {inspoAnalysis.palette}
+            </div>
+          )}
+          <div className="img-grid grid-auto mt-3">
+            {bulkImages.map(img=>{
+              const sel=selectedIds.includes(img.id);
+              const sc=scores[img.id];
+              return(
+                <div key={img.id} className={`img-thumb clickable ${sel?'selected':'dimmed'}`} onClick={()=>toggleSelect(img.id)}>
+                  <img src={img.url} alt={img.name}/>
+                  {sc&&<div className="score-badge">{Math.round(sc.score)}</div>}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex-between mt-4">
+            <button className="btn btn-outline btn-sm" onClick={()=>setStep(1)}>← Back</button>
+            <button className="btn" onClick={()=>{setEditingIdx(0);setStep(3);}}>Edit Selection →</button>
+          </div>
+        </div>
+      )}
+
+      {step===3&&(
+        <div className="card">
+          <div className="section-title">Refine Edits</div>
+          <p className="section-sub">Adjust settings — changes apply to all images.</p>
+          <div className="edit-layout mt-3">
+            <div>
+              <BeforeAfter img={editImg} settings={editSettings} applyEdits={applyEdits}/>
+              <div className="edit-thumbs">
+                {selectedImages.map((img,i)=>(
+                  <div key={img.id} className={`edit-thumb ${i===editingIdx?'active-thumb':''}`} onClick={()=>setEditingIdx(i)}>
+                    <img src={img.url} alt=""/>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:'0.7rem',letterSpacing:'0.12em',textTransform:'uppercase',color:'var(--muted)',marginBottom:'1rem'}}>Adjustments</div>
+              {[
+                {k:'warmth',label:'Warmth',min:-30,max:30},
+                {k:'brightness',label:'Brightness',min:-20,max:20},
+                {k:'contrast',label:'Contrast',min:-20,max:20},
+                {k:'saturation',label:'Saturation',min:-20,max:20},
+                {k:'vibrancy',label:'Vibrancy',min:-20,max:20},
+                {k:'vignette',label:'Vignette',min:0,max:40},
+                {k:'sharpness',label:'Sharpness',min:0,max:50},
+              ].map(({k,label,min,max})=>(
+                <div key={k} className="slider-group">
+                  <div className="slider-label"><span>{label}</span><span>{editSettings[k]}</span></div>
+                  <input type="range" min={min} max={max} value={editSettings[k]}
+                    onChange={e=>setEditSettings(p=>({...p,[k]:Number(e.target.value)}))}/>
+                </div>
+              ))}
+              {aiEditSettings&&(
+                <button className="btn btn-outline btn-sm mt-2" style={{width:'100%'}}
+                  onClick={()=>setEditSettings(aiEditSettings)}>Reset to AI</button>
+              )}
+            </div>
+          </div>
+          <div className="flex-between mt-4">
+            <button className="btn btn-outline btn-sm" onClick={()=>setStep(2)}>← Back</button>
+            <button className="btn" onClick={()=>setStep(4)}>Preview →</button>
+          </div>
+        </div>
+      )}
+
+      {step===4&&(
+        <div className="card">
+          <div className="section-title">Ready to post</div>
+          <p className="section-sub">{selectedImages.length} images curated for your feed.</p>
+          <div className="feed-preview mt-3">
+            {selectedImages.map(img=>(
+              <div key={img.id} className="feed-item"><img src={img.url} alt=""/></div>
+            ))}
+          </div>
+          <div className="notice mt-3">
+            <strong>Export:</strong> All edits baked in at full resolution.
+          </div>
+          <div style={{display:'flex',justifyContent:'center',gap:'0.75rem',marginTop:'1.8rem',flexWrap:'wrap'}}>
+            <button className="btn btn-outline" onClick={()=>setStep(3)}>← Edit</button>
+            <button className="btn btn-dark" disabled={downloading} onClick={downloadAll}>
+              {downloading?<><div className="spinner"/>Preparing...</>:'Download ZIP ↓'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropZone({onFiles,label,disabled,multiple}){
+  const ref=useRef();
+  const [drag,setDrag]=useState(false);
+  const onDrop=e=>{
+    e.preventDefault();setDrag(false);
+    if(!disabled&&e.dataTransfer.files.length)onFiles(e.dataTransfer.files);
+  };
+  return(
+    <div className={`upload-zone ${drag?'dragging':''}`} style={{opacity:disabled?0.5:1}}
+      onDragOver={e=>{e.preventDefault();if(!disabled)setDrag(true);}}
+      onDragLeave={()=>setDrag(false)}
+      onDrop={onDrop}
+      onClick={()=>!disabled&&ref.current.click()}>
+      <input ref={ref} type="file" accept="image/*" multiple={multiple}
+        onChange={e=>{if(!disabled)onFiles(e.target.files);e.target.value='';}}/>
+      <div className="upload-icon">+</div>
+      <div className="upload-text"><strong>{label}</strong><br/>Click or drag & drop</div>
+    </div>
+  );
+}
+
+function BeforeAfter({img,settings,applyEdits}){
+  const [view,setView]=useState('after');
+  const [editedUrl,setEditedUrl]=useState(null);
+  useEffect(()=>{
+    if(!img)return;
+    const image=new Image();
+    image.onload=()=>{
+      const c=document.createElement('canvas');
+      setEditedUrl(applyEdits(c,image,settings));
+    };
+    image.src=img.url;
+  },[img,settings,applyEdits]);
+  if(!img)return null;
+  return(
+    <>
+      <div className="ba-toggle">
+        {['before','after'].map(v=>(
+          <button key={v} className={`ba-btn ${view===v?'active':''}`} onClick={()=>setView(v)}>
+            {v.charAt(0).toUpperCase()+v.slice(1)}
+          </button>
+        ))}
+      </div>
+      <div className="ba-wrap">
+        <img src={view==='after'&&editedUrl?editedUrl:img.url} alt="preview"/>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById('root'));
+</script>
+</body>
+</html>
