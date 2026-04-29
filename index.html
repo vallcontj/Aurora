@@ -446,8 +446,12 @@ function App(){
     let inspoAesthetic=null;
     let aiEdits=null;
 
-    const key=apiKey||localStorage.getItem('aurora_key')||'';
-    const headers={'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+    const key=(apiKey||localStorage.getItem('aurora_key')||'').trim();
+    if(!key){
+      setAnalyzing(false);
+      setError('Please enter your Gemini API key. Get one free at aistudio.google.com');
+      return;
+    }
 
     const batches=[];
     for(let i=0;i<bulkImages.length;i+=BATCH) batches.push(bulkImages.slice(i,i+BATCH));
@@ -475,48 +479,53 @@ function App(){
         // Resize batch images
         const batchB64=await Promise.all(batch.map(img=>resizeImage(img.url,1024)));
 
-        // Build content: inspo images first, then batch candidates
-        const content=[
-          {type:'text',text:`You are an elite Instagram photo curator for Auckland, New Zealand lifestyle and fashion creators.
+        // Build prompt text — images are passed separately as inline_data parts
+        const promptText=`You are an elite Instagram photo curator for Auckland, New Zealand lifestyle and fashion creators.
 
-STEP 1 — Study the next ${inspoImages.length} INSPIRATION image(s) carefully. Extract:
+STEP 1 — Study the first ${inspoImages.length} INSPIRATION image(s) provided. Extract:
 - Exact colour temperature (warm/cool/neutral)
 - Key colours in the palette (e.g. warm whites, dusty rose, golden beige)
 - Mood and atmosphere (e.g. golden hour, clean minimal, moody editorial)
 - Lighting style (soft natural, harsh, studio, backlit)
-- Composition tendencies (close crop, wide, rule of thirds, centred)
 - Saturation level (muted/desaturated, natural, vibrant)
 - Contrast style (high contrast, soft/low contrast, balanced)
 
-STEP 2 — Score each of the ${batch.length} CANDIDATE image(s) that follow the inspiration images.
-Score 0-100 based on VISUAL match to the inspiration aesthetic. Be strict and use the full range.
-A score of 90+ means it could have been one of the inspiration images.
-A score below 40 means it clashes with the aesthetic (wrong colours, mood, lighting).
+STEP 2 — Score each of the next ${batch.length} CANDIDATE image(s) that follow.
+Score 0-100 based on VISUAL match to the inspiration aesthetic. Be strict and spread scores widely.
+90+ = could have been an inspiration image. Below 40 = clashes with the aesthetic.
 
 Scoring weights:
-- Colour palette & tone match to inspo: 45%
+- Colour palette & tone match: 45%
 - Mood, atmosphere & style match: 30%
-- Instagram performance (composition, lighting, visual hierarchy) for Auckland NZ: 15%
-- Technical quality (sharp, well-exposed, no blur): 10%
+- Instagram performance for Auckland NZ lifestyle/fashion: 15%
+- Technical quality (sharp, well-exposed): 10%
 
 ${bi===0?`STEP 3 — Also provide:
-- aesthetic: short mood and palette description
-- edits: integer adjustments to match the inspo look (warmth -30 to 30, brightness -20 to 20, contrast -20 to 20, saturation -20 to 20, vibrancy -20 to 20, vignette 0 to 40, sharpness 0 to 50)`:''}
+- aesthetic: one-line mood and palette description
+- edits: integer adjustments to match inspo look: warmth(-30 to 30), brightness(-20 to 20), contrast(-20 to 20), saturation(-20 to 20), vibrancy(-20 to 20), vignette(0 to 40), sharpness(0 to 50)`:''}
 
-Return ONLY valid JSON, no prose, no markdown fences:
-{"scores":[{"index":0,"score":78,"reason":"Similar warm tones but composition too busy"}]${bi===0?`,"aesthetic":{"mood":"warm golden lifestyle","palette":"creamy whites, warm beige, soft gold"},"edits":{"warmth":20,"brightness":5,"contrast":8,"saturation":6,"vibrancy":4,"vignette":18,"sharpness":32}`:''}}`},
-          ...inspoB64.map(b64=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}})),
-          ...batchB64.map(b64=>({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}})),
+Return ONLY valid JSON, no prose, no markdown:
+{"scores":[{"index":0,"score":78,"reason":"Similar warm tones but composition too busy"}]${bi===0?`,"aesthetic":{"mood":"warm golden lifestyle","palette":"creamy whites, warm beige, soft gold"},"edits":{"warmth":20,"brightness":5,"contrast":8,"saturation":6,"vibrancy":4,"vignette":18,"sharpness":32}`:''}}\`;
+
+        // Build Gemini request — parts array with prompt + images
+        const parts=[
+          {text:promptText},
+          ...inspoB64.map(b64=>({inline_data:{mime_type:'image/jpeg',data:b64}})),
+          ...batchB64.map(b64=>({inline_data:{mime_type:'image/jpeg',data:b64}})),
         ];
-
-        const res=await fetch('https://api.anthropic.com/v1/messages',{
-          method:'POST',headers,
-          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content}]})
+        const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:0.1,maxOutputTokens:800}})
         });
-        if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error '+res.status);}
+        if(!res.ok){
+          let errMsg='API error '+res.status;
+          try{const e=await res.json();errMsg=e.error?.message||errMsg;}catch(x){}
+          throw new Error(errMsg);
+        }
         const data=await res.json();
-        const text=data.content.map(c=>c.text||'').join('');
-        const clean=text.replace(/```json|```/g,'').trim();
+        const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        const clean=raw.replace(/```json|```/g,'').trim();
         const parsed=JSON.parse(clean);
 
         // Map batch-local index (0..BATCH-1) back to global bulkImages index
@@ -653,16 +662,16 @@ Return ONLY valid JSON, no prose, no markdown fences:
 
       {!apiSaved&&(
         <div className="api-setup">
-          <div className="api-setup-title">Anthropic API Key</div>
+          <div className="api-setup-title">Gemini API Key (free)</div>
           <div className="api-row">
-            <input className="api-input" type="password" placeholder="sk-ant-..." value={apiKey}
+            <input className="api-input" type="password" placeholder="AIza..." value={apiKey}
               onChange={e=>setApiKey(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter'&&apiKey)saveKey();}}/>
             <button className="btn btn-sm" disabled={!apiKey} onClick={saveKey}>Save</button>
           </div>
           <div className="api-note">
-            Your key is stored locally and never sent to any server except Anthropic.<br/>
-            Get yours at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+            Your key is stored locally in your browser only — never shared.<br/>
+            Get a free key at <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a> → Get API Key
           </div>
         </div>
       )}
